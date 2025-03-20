@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 
 const fs = require("fs");
+const { start } = require("repl");
 
 const args = process.argv.slice(2);
 const command = args[0];
 
-// console.log(args);
-// const inquirer = require("inquirer");
 
-// const { up } = require("inquirer/lib/utils/readline");
 const dataFilePath = "./rahul.json";
 let dataFile;
 
 
-// ?check if file exists or not 
+//------------------------------------------------------------------------------------------------------------------------------//
+
+// check if databse exists or not if not create a new one
+
+//------------------------------------------------------------------------------------------------------------------------------//
 
 if(!fs.existsSync(dataFilePath)){
   
@@ -30,9 +32,17 @@ if(!fs.existsSync(dataFilePath)){
 
 }
 
+//------------------------------------------------------------------------------------------------------------------------------//
+
+// cli handler function to hnadle all commands
+
+//------------------------------------------------------------------------------------------------------------------------------//
+
 function commandHandler(){
-    console.log('Command:', command);
-    console.log('All args:', args);
+
+    //uncomment below to see the args and command
+    // console.log('Command:', command);
+    // console.log('All args:', args);
 
    switch(command){
         case 'add':
@@ -54,13 +64,50 @@ function commandHandler(){
 
         case 'delete':
             // parse args[1] to int 
-            const id = parseInt(args[1]);
-            if(!id){
+            const delId = parseInt(args[1]);
+            if(!delId){
                 console.log("Please provide a Todo id");
                 return; 
             }    
-            deleteTodo(id);
+            deleteTodo(delId);
             break;
+
+        case 'mark-in-progress':
+
+            const markId = parseInt(args[1]);
+            if(!markId){
+                console.log("Please provide a Todo id");
+                return; 
+            }    
+            markInProgress(markId);
+            break;
+        case 'mark-done':
+
+            const doneId = parseInt(args[1]);
+            if(!doneId){
+                console.log("Please provide a Todo id");
+                return; 
+            }    
+            markDone(doneId);
+            break;
+
+        case 'list':
+            if(args[1] === "done"){
+                listDone();
+                return;
+            }
+            if(args[1] === "todo"){
+                listPendingTodos();
+                return;
+            }
+            if(args[1] === "in-progress"){
+                listInProgressTodos();
+                return;
+            }
+            
+            lisAllTodos();   
+            break; 
+
         default:
             console.log("Invalid command");
             break;  
@@ -68,7 +115,12 @@ function commandHandler(){
    }
 
 }
+//------------------------------------------------------------------------------------------------------------------------------//
 
+// functions start from here
+
+
+//------------------------------------------------------------------------------------------------------------------------------//
 // # Adding a new task
 // task-cli add "Buy groceries"
 // # Output: Task added successfully (ID: 1)
@@ -79,15 +131,17 @@ const addTodo = (desc)=>{
     // 2nd
     const jsonData = JSON.parse(data);
 
+    // Generate a unique ID
+    const newId = jsonData.todos.length > 0 ? Math.max(...jsonData.todos.map(todo => todo.id)) + 1 : 1;
 
-    const newTodo = {"id":jsonData.todos.length+1,"description":desc,"status":"pending","createdAt":new Date().toISOString(),"updatedAt":new Date().toISOString()}
+    const newTodo = {"id": newId, "description": desc, "status": "Pending", "createdAt": new Date().toISOString(), "updatedAt": new Date().toISOString()}
 
     //3rd
     jsonData.todos.push(newTodo);
-//4th
-    fs.writeFileSync(dataFilePath,JSON.stringify(jsonData,null,2));
+    //4th
+    fs.writeFileSync(dataFilePath, JSON.stringify(jsonData, null, 2));
 
-    console.log(desc + " Added successfully in Todo list ID: "+jsonData.todos.length);
+    console.log(desc + " Added successfully in Todo list ID: " + newId);
 }
 
 // # Updating and deleting tasks
@@ -113,19 +167,87 @@ const updateTodo = (id,desc)=>{
 }
 
 const deleteTodo = (id)=>{
-    
+
     const data = fs.readFileSync(dataFilePath, 'utf8');
     const jsonData = JSON.parse(data);
-
+    //fix id after deleting id it should reindex
     const todoIndex = jsonData.todos.findIndex(todo => todo.id == id);
     if(todoIndex === -1){
         console.log("Invalid id");
         return;
     }
-    jsonData.todos.splice(todoIndex,1);
+    jsonData.todos.splice(todoIndex, 1);
 
+    // Reindex the remaining todos
+    jsonData.todos.forEach((todo, index) => {
+        todo.id = index + 1;
+    });
+
+    fs.writeFileSync(dataFilePath, JSON.stringify(jsonData, null, 2));
+    console.log("Todo ID: " + id + " deleted successfully");
+}
+
+
+const markInProgress = (id)=>{
+
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    const todoIndex = jsonData.todos.findIndex(todo => todo.id == id);
+    if(todoIndex === -1){
+        console.log("Invalid id");
+        return;
+    }
+    jsonData.todos[todoIndex].status = "In Progress";
     fs.writeFileSync(dataFilePath,JSON.stringify(jsonData,null,2));
-    console.log("Todo ID: " +id+ " deleted successfully");
+    console.log("Todo ID: " +id+ " marked as In Progress");
+
+}
+const markDone = (id)=>{
+
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    const todoIndex = jsonData.todos.findIndex(todo => todo.id == id);
+    if(todoIndex === -1){
+        console.log("Invalid id");
+        return;
+    }
+    jsonData.todos[todoIndex].status = "Done";
+    fs.writeFileSync(dataFilePath,JSON.stringify(jsonData,null,2));
+    console.log("Todo ID: " +id+ " marked as Done");
+
+}
+
+const lisAllTodos = ()=>{
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    console.log(jsonData.todos);
+
+}
+
+
+const listDone =()=>{
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    const doneTodos = jsonData.todos.filter(todo => todo.status === "Done");   
+    console.log(doneTodos); 
+
+
+}
+const listPendingTodos =()=>{
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    const pendingTodos = jsonData.todos.filter(todo => todo.status === "Pending");   
+    console.log(pendingTodos); 
+
+
+}
+const listInProgressTodos =()=>{
+    const data = fs.readFileSync(dataFilePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    const inProgressTodos = jsonData.todos.filter(todo => todo.status === "In Progress");   
+    console.log(inProgressTodos); 
+
+
 }
 
 
